@@ -25,15 +25,6 @@ def stringify_dict(d):
             str_d[k] = v.__name__ if callable(v) else v 
     return str_d
 
-def get_dataloaders(**kwargs):
-    """
-    Sample pytorch dataloader
-    """
-    trainloader = torch.utils.data.DataLoader(**kwargs)
-    valloader = torch.utils.data.DataLoader(**kwargs)
-    
-    return trainloader,valloader
-
 class Trainer:
     def __init__(
         self,
@@ -56,11 +47,11 @@ class Trainer:
         if general_options['use_tensorboard'] == True:
             self.use_tensorboard = True
             from torch.utils.tensorboard import SummaryWriter
-            self.logger = SummaryWriter('runs2/'+self.experiment_name)
+            self.logger = SummaryWriter('runs/'+self.experiment_name)
             self.logger.add_text('summary', experiment_summary)
     
-    def initialize_dataloaders(self, **dataloader_kwargs):
-        self.trainloader, self.valloader = get_dataloaders(**dataloader_kwargs)
+    def initialize_dataloaders(self, dataloader_fn, **dataloader_kwargs):
+        self.trainloader, self.valloader = dataloader_fn(**dataloader_kwargs)
 
     def build_model(self, network, **network_kwargs):
         """
@@ -118,6 +109,7 @@ class Trainer:
                 lr_scheduler = None, 
                 lr_scheduler_kwargs={}, 
                 metric = None,
+                metric_kwargs = {},
                 save_best=True,
                 save_location='',
                 save_name='',
@@ -155,8 +147,8 @@ class Trainer:
 
         train_metric_fn, val_metric_fn = None, None
         if metric is not None:
-            train_metric = metric()
-            val_metric = metric()
+            train_metric = metric(**metric_kwargs)
+            val_metric = metric(**metric_kwargs)
             train_metric_fn = train_metric.add
             val_metric_fn = val_metric.add
 
@@ -235,40 +227,6 @@ class Trainer:
             self.logger.add_hparams(hparam_dict = stringify_dict(training_hparams), metric_dict = metrics)
     ## end train()
 
-
-### General hyper-parameters
-general_options = {
-    'use_cuda' :          True,         # use GPU ?
-    'use_tensorboard' :   True          # Use Tensorboard for saving hparams and metrics ?
-}
-
-### Training hyper-parameters
-trainer_args = {
-    'epochs' : 50, 
-    'loss_fn' : nn.CrossEntropyLoss, ## must be of type nn.Module
-    'optimizer' : optim.SGD, 
-    'loss_fn_kwargs': {},
-    'optimizer_kwargs' : {'lr' : 0.001, 'momentum' : 0.9, 'weight_decay' : 5e-4},
-    'lr_scheduler' : torch.optim.lr_scheduler.CosineAnnealingLR, 
-    'lr_scheduler_kwargs' : {'T_max' : 200},
-    'metric': Metric,  ## must be of type metric.Metric or its derived
-    'save_best' : True,
-    'save_location' : './saved_models',
-    'save_name' : 'test_trainer_base',
-    'continue_training_saved_model' : None,
-}
-
-dataloader_args = {
-    'batch_size' : 32,
-    'num_workers': 12
-}
-
-network_args = {
-    'n_channels': 3
-}
-
-experiment_summary = 'test'
-
 def test():
     class DummyNet(nn.Module):
         def __init__(self, n_channels):
@@ -276,8 +234,51 @@ def test():
             self.d = nn.Linear(n_channels, 10)
         def forward(self, x):
             return self.d(x)
+    
+    def get_dataloaders(**kwargs):
+        """
+        Sample pytorch dataloader
+        """
+        trainloader = torch.utils.data.DataLoader(**kwargs)
+        valloader = torch.utils.data.DataLoader(**kwargs)
+        
+        return trainloader,valloader
+
+    ### General hyper-parameters
+    general_options = {
+        'use_cuda' :          True,         # use GPU ?
+        'use_tensorboard' :   True          # Use Tensorboard for saving hparams and metrics ?
+    }
+
+    ### Training hyper-parameters
+    trainer_args = {
+        'epochs' : 50, 
+        'loss_fn' : nn.CrossEntropyLoss, ## must be of type nn.Module
+        'optimizer' : optim.SGD, 
+        'loss_fn_kwargs': {},
+        'optimizer_kwargs' : {'lr' : 0.001, 'momentum' : 0.9, 'weight_decay' : 5e-4},
+        'lr_scheduler' : torch.optim.lr_scheduler.CosineAnnealingLR, 
+        'lr_scheduler_kwargs' : {'T_max' : 200},
+        'metric': Metric,  ## must be of type metric.Metric or its derived
+        'metric_kwargs': {},
+        'save_best' : True,
+        'save_location' : './saved_models',
+        'save_name' : 'test_trainer_base',
+        'continue_training_saved_model' : None,
+    }
+
+    dataloader_args = {
+        'batch_size' : 32,
+        'num_workers': 12
+    }
+
+    network_args = {
+        'n_channels': 3
+    }
+
+    experiment_summary = 'test'
             
     trainer = Trainer('test', general_options, experiment_summary=experiment_summary)
-    trainer.initialize_dataloaders(**dataloader_args)
+    trainer.initialize_dataloaders(get_dataloaders, **dataloader_args)
     trainer.build_model(DummyNet, **network_args)
     trainer.train(**trainer_args)
