@@ -10,7 +10,7 @@ import torch.nn as nn
 from torch import optim
 from tqdm import tqdm
 
-from metric.metric import Metric
+from pytorch_trainer.metric.metric import Metric
 
 def stringify_dict(d):
     """
