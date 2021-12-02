@@ -10,8 +10,7 @@ import torch.nn as nn
 from torch import optim
 from tqdm import tqdm
 
-from data_loader import get_dataloaders
-from metric.l1_error import L1Error
+from metric.metric import Metric
 
 def stringify_dict(d):
     """
@@ -25,6 +24,15 @@ def stringify_dict(d):
         else:
             str_d[k] = v.__name__ if callable(v) else v 
     return str_d
+
+def get_dataloaders(**kwargs):
+    """
+    Sample pytorch dataloader
+    """
+    trainloader = torch.utils.data.DataLoader(**kwargs)
+    valloader = torch.utils.data.DataLoader(**kwargs)
+    
+    return trainloader,valloader
 
 class Trainer:
     def __init__(
@@ -243,7 +251,7 @@ trainer_args = {
     'optimizer_kwargs' : {'lr' : 0.001, 'momentum' : 0.9, 'weight_decay' : 5e-4},
     'lr_scheduler' : torch.optim.lr_scheduler.CosineAnnealingLR, 
     'lr_scheduler_kwargs' : {'T_max' : 200},
-    'metric': L1Error,  ## must be of type metric.Metric or its derived
+    'metric': Metric,  ## must be of type metric.Metric or its derived
     'save_best' : True,
     'save_location' : './saved_models',
     'save_name' : 'test_trainer_base',
@@ -262,7 +270,14 @@ network_args = {
 experiment_summary = 'test'
 
 def test():
+    class DummyNet(nn.Module):
+        def __init__(self, n_channels):
+            super().__init__()
+            self.d = nn.Linear(n_channels, 10)
+        def forward(self, x):
+            return self.d(x)
+            
     trainer = Trainer('test', general_options, experiment_summary=experiment_summary)
     trainer.initialize_dataloaders(**dataloader_args)
-    trainer.build_model(UNetRegressor, **network_args)
+    trainer.build_model(DummyNet, **network_args)
     trainer.train(**trainer_args)
