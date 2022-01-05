@@ -1,12 +1,20 @@
+import os, sys
 import setuptools
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+# "setup.py publish" shortcut.
+if sys.argv[-1] == 'publish':
+    os.system('python setup.py sdist')
+    os.system('twine upload dist/*')
+    os.system('rm -rf dist pytorch_trainer_tensorboard.egg-info')
+    sys.exit()
+
 
 setuptools.setup(
     name='pytorch-trainer-tensorboard',  
-    version='0.1',
+    version='0.1.1',
     license='MIT',
     author="Vamshi Chowdary Madala",
     author_email="vamchowdary72@gmail.com",

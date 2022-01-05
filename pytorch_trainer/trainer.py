@@ -93,7 +93,7 @@ class Trainer:
 
             running_loss += loss.item()
             if metric_fn is not None:
-                metric_fn(outputs.detach(), labels.detach())
+                metric_fn(outputs.detach().cpu().numpy(), labels.detach().cpu().numpy())
 
             del loss, outputs, images, labels
         running_loss = running_loss/len(dataloader)
@@ -145,6 +145,8 @@ class Trainer:
             self.optimizer.load_state_dict(saved_model['optimizer'])
             start_epoch = saved_model['epoch']
 
+        train_loss, val_loss = None, None
+        train_metric_value, val_metric_value = None, None
         train_metric_fn, val_metric_fn = None, None
         if metric is not None:
             train_metric = metric(**metric_kwargs)
@@ -152,79 +154,83 @@ class Trainer:
             train_metric_fn = train_metric.add
             val_metric_fn = val_metric.add
 
-        for e in tqdm(range(start_epoch, start_epoch+epochs)):
-            if metric is not None:
-                train_metric.reset()
-                val_metric.reset()
+        try:
+            for e in tqdm(range(start_epoch, start_epoch+epochs)):
+                if metric is not None:
+                    train_metric.reset()
+                    val_metric.reset()
 
-            train_loss = self.single_step(is_train_step=True, metric_fn=train_metric_fn)
-            print("{}. Training loss = {:.3f}".format(e, train_loss))
-            if metric is not None:
-                train_metric_value = train_metric.value()
-                print("{}. Train Metric - {}: {}".format(e, metric.__name__, train_metric_value))
-            val_loss = self.single_step(is_train_step=False, metric_fn=val_metric_fn)
-            print("{}. Validation loss = {:.3f}".format(e, val_loss))
-            if metric is not None:
-                val_metric_value = val_metric.value()
-                print("{}. Val Metric - {}: {}".format(e, metric.__name__, val_metric_value))
+                train_loss = self.single_step(is_train_step=True, metric_fn=train_metric_fn)
+                print("{}. Training loss = {:.7f}".format(e, train_loss))
+                if metric is not None:
+                    train_metric_value = train_metric.value()
+                    print("{}. Train Metric - {}: {}".format(e, metric.__name__, train_metric_value))
+                val_loss = self.single_step(is_train_step=False, metric_fn=val_metric_fn)
+                print("{}. Validation loss = {:.7f}".format(e, val_loss))
+                if metric is not None:
+                    val_metric_value = val_metric.value()
+                    print("{}. Val Metric - {}: {}".format(e, metric.__name__, val_metric_value))
 
-            if lr_scheduler is not None:
-                scheduler.step()
+                if lr_scheduler is not None:
+                    scheduler.step()
 
+                ## logging
+                if self.use_tensorboard:
+                    self.logger.add_scalars("losses", {'train': train_loss,
+                                                    'val': val_loss}, e)
+                    if metric is not None:
+                        if isinstance(train_metric_value, tuple):
+                            ## @TODO make this pretty
+                            train_metric_value = train_metric_value[0]
+                            val_metric_value = val_metric_value[0]
+
+                        self.logger.add_scalars(metric.__name__, {'train':train_metric_value ,
+                                                    'val': val_metric_value}, e)
+
+                    for param_name, param_w in self.model.named_parameters():
+                        self.logger.add_histogram(param_name, param_w, e)
+
+                ## save best model
+                if save_best == True:
+                    if val_loss < best_val_loss:
+                        best_val_loss = val_loss
+                        torch.save( { 
+                                        'epoch': e,
+                                        'state_dict': self.model.to('cpu').state_dict(),
+                                        'train_loss': train_loss,
+                                        'val_loss': val_loss,
+                                        'optimizer': self.optimizer.state_dict()
+                                    }, save_model_path )
+                        self.model.to(self.device)
+            ## end epoch for
+        finally:
             ## logging
             if self.use_tensorboard:
-                self.logger.add_scalars("losses", {'train': train_loss,
-                                                   'val': val_loss}, e)
-                if metric is not None:
-                    if isinstance(train_metric_value, tuple):
-                        ## @TODO make this pretty
-                        train_metric_value = train_metric_value[0]
-                        val_metric_value = val_metric_value[0]
+                images, labels = next(iter(self.trainloader))
+                images = images.to(self.device)
+                self.logger.add_graph(self.model, images)
 
-                    self.logger.add_scalars(metric.__name__, {'train':train_metric_value ,
-                                                   'val': val_metric_value}, e)
+                training_hparams = {
+                    'epochs': start_epoch+epochs,
+                    'loss_fn': loss_fn,
+                    'optimizer': optimizer,
+                    **loss_fn_kwargs,
+                    **optimizer_kwargs
+                }
+                if lr_scheduler is not None:
+                    training_hparams.update({'lr_scheduler':lr_scheduler}, **lr_scheduler_kwargs)
 
-                for param_name, param_w in self.model.named_parameters():
-                    self.logger.add_histogram(param_name, param_w, e)
+                if (train_loss is not None) and (val_loss is not None) and (train_metric_value is not None) and (train_metric_value is not None):
+                    metrics = {
+                            'Train_loss' : train_loss,
+                            'Val_loss' : val_loss,
+                    }
+                    if metric is not None:
+                        metrics.update({ 'Train_'+metric.__name__ : train_metric_value, 'Val_'+metric.__name__ : train_metric_value })
+                else:
+                    metrics = {}
+                self.logger.add_hparams(hparam_dict = stringify_dict(training_hparams), metric_dict = metrics)
 
-            ## save best model
-            if save_best == True:
-                if val_loss < best_val_loss:
-                    best_val_loss = val_loss
-                    torch.save( { 
-                                    'epoch': e,
-                                    'state_dict': self.model.to('cpu').state_dict(),
-                                    'train_loss': train_loss,
-                                    'val_loss': val_loss,
-                                    'optimizer': self.optimizer.state_dict()
-                                }, save_model_path )
-                    self.model.to(self.device)
-        ## end epoch for
-
-        ## logging
-        if self.use_tensorboard:
-            images, labels = next(iter(self.trainloader))
-            images = images.to(self.device)
-            self.logger.add_graph(self.model, images)
-
-            training_hparams = {
-                'epochs': start_epoch+epochs,
-                'loss_fn': loss_fn,
-                'optimizer': optimizer,
-                **loss_fn_kwargs,
-                **optimizer_kwargs
-            }
-            if lr_scheduler is not None:
-                training_hparams.update({'lr_scheduler':lr_scheduler}, **lr_scheduler_kwargs)
-
-            metrics = {
-                    'Train_loss' : train_loss,
-                    'Val_loss' : val_loss,
-            }
-            if metric is not None:
-                metrics.update({ 'Train_'+metric.__name__ : train_metric_value, 'Val_'+metric.__name__ : val_metric_value })
-
-            self.logger.add_hparams(hparam_dict = stringify_dict(training_hparams), metric_dict = metrics)
     ## end train()
 
 def test():
