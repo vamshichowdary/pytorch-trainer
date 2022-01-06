@@ -1,7 +1,7 @@
 import numpy as np
-from metric import metric
+from .metric import Metric
 
-class Accuracy(metric.Metric):
+class Accuracy(Metric):
     """ Accuracy.
 
     Args:

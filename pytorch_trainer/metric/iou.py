@@ -1,9 +1,9 @@
 import numpy as np
-from metric import metric
-from metric.confusionmatrix import ConfusionMatrix
+from .metric import Metric
+from .confusionmatrix import ConfusionMatrix
 
 
-class IoU(metric.Metric):
+class IoU(Metric):
     """Computes the intersection over union (IoU) per class and corresponding
     mean (mIoU).
 

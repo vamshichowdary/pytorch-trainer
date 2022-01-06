@@ -1,8 +1,8 @@
 import numpy as np
-from metric import metric
+from .metric import Metric
 
 
-class ConfusionMatrix(metric.Metric):
+class ConfusionMatrix(Metric):
     """Constructs a confusion matrix for a multi-class classification problems.
 
     Does not support multi-label, multi-class problems.

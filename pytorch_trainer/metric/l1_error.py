@@ -1,8 +1,8 @@
 import numpy as np
-from metric import metric
+from .metric import Metric
 
 
-class L1Error(metric.Metric):
+class L1Error(Metric):
     """L1 error.
 
     Args:
