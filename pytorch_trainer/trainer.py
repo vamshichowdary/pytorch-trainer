@@ -220,13 +220,13 @@ class Trainer:
                 if lr_scheduler is not None:
                     training_hparams.update({'lr_scheduler':lr_scheduler}, **lr_scheduler_kwargs)
 
-                if (train_loss is not None) and (val_loss is not None) and (train_metric_value is not None) and (train_metric_value is not None):
+                if (train_loss is not None) and (val_loss is not None) and (train_metric_value is not None) and (val_metric_value is not None):
                     metrics = {
                             'Train_loss' : train_loss,
                             'Val_loss' : val_loss,
                     }
                     if metric is not None:
-                        metrics.update({ 'Train_'+metric.__name__ : train_metric_value, 'Val_'+metric.__name__ : train_metric_value })
+                        metrics.update({ 'Train_'+metric.__name__ : train_metric_value, 'Val_'+metric.__name__ : val_metric_value })
                 else:
                     metrics = {}
                 self.logger.add_hparams(hparam_dict = stringify_dict(training_hparams), metric_dict = metrics)

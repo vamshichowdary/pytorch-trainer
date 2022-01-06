@@ -11,3 +11,5 @@
 
 ## sanity checks: 
 1. check loss reduces on a fixed data samples (say 1 or 2 inputs) by iterating
+
+## @TODO split train-val
