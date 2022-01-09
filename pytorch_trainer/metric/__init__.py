@@ -4,4 +4,4 @@ from .confusionmatrix import ConfusionMatrix
 from .iou import IoU
 from .metric import Metric
 
-__all__ = ['Accuracy', 'L1Error', 'Metric']
+__all__ = ['Accuracy', 'L1Error', 'ConfusionMatrix', 'IoU', 'Metric']

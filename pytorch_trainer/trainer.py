@@ -40,18 +40,28 @@ class Trainer:
         self.optimizer = None
         self.criterion = None
         ## dataloaders
-        self.trainloader, self.valloader = None, None
+        self.trainloader, self.valloader, self.testloader = None, None, None
 
         ## logger
         self.use_tensorboard = False
+        self.tensorboard_weight_hist = False
         if general_options['use_tensorboard'] == True:
             self.use_tensorboard = True
+            if general_options['tensorboard_weight_hist'] == True:
+                self.tensorboard_weight_hist = True
             from torch.utils.tensorboard import SummaryWriter
             self.logger = SummaryWriter('runs/'+self.experiment_name)
             self.logger.add_text('summary', experiment_summary)
     
     def initialize_dataloaders(self, dataloader_fn, **dataloader_kwargs):
-        self.trainloader, self.valloader = dataloader_fn(**dataloader_kwargs)
+        loaders = dataloader_fn(**dataloader_kwargs)
+        if len(loaders) == 2:
+            (self.trainloader, self.valloader) = loaders
+        elif len(loaders) == 3:
+            (self.trainloader, self.valloader, self.testloader) = loaders
+        else:
+            print('Cannot unpack the dataloders!')
+            return None
 
     def build_model(self, network, **network_kwargs):
         """
@@ -60,7 +70,7 @@ class Trainer:
         self.model = network(**network_kwargs)
         self.model.to(self.device)
     
-    def single_step(self, is_train_step, metric_fn=None):
+    def single_step(self, dataloader, is_train_step, metric_fn=None):
         """
         Perform one step of training/validation (one iteration of the corresponding dataloader)
         Args:
@@ -69,10 +79,8 @@ class Trainer:
         """
         if is_train_step:
             self.model.train()
-            dataloader = self.trainloader
         else:
             self.model.eval()
-            dataloader = self.valloader
 
         running_loss = 0
 
@@ -160,12 +168,12 @@ class Trainer:
                     train_metric.reset()
                     val_metric.reset()
 
-                train_loss = self.single_step(is_train_step=True, metric_fn=train_metric_fn)
+                train_loss = self.single_step(self.trainloader, is_train_step=True, metric_fn=train_metric_fn)
                 print("{}. Training loss = {:.7f}".format(e, train_loss))
                 if metric is not None:
                     train_metric_value = train_metric.value()
                     print("{}. Train Metric - {}: {}".format(e, metric.__name__, train_metric_value))
-                val_loss = self.single_step(is_train_step=False, metric_fn=val_metric_fn)
+                val_loss = self.single_step(self.valloader, is_train_step=False, metric_fn=val_metric_fn)
                 print("{}. Validation loss = {:.7f}".format(e, val_loss))
                 if metric is not None:
                     val_metric_value = val_metric.value()
@@ -186,9 +194,9 @@ class Trainer:
 
                         self.logger.add_scalars(metric.__name__, {'train':train_metric_value ,
                                                     'val': val_metric_value}, e)
-
-                    for param_name, param_w in self.model.named_parameters():
-                        self.logger.add_histogram(param_name, param_w, e)
+                    if self.tensorboard_weight_hist:
+                        for param_name, param_w in self.model.named_parameters():
+                            self.logger.add_histogram(param_name, param_w, e)
 
                 ## save best model
                 if save_best == True:
@@ -233,6 +241,39 @@ class Trainer:
 
     ## end train()
 
+    def test(
+            self,
+            metric = None,
+            metric_kwargs = {},
+            saved_model = None,
+        ):
+        if self.testloader is None:
+            print("No testset dataloader found!")
+            return
+        if self.criterion is None:
+            print("Loss function not initialized!")
+            return
+
+        if saved_model is not None:
+            saved_model = torch.load(saved_model)
+            self.model.load_state_dict(saved_model['state_dict'])
+
+        metric_fn = None
+        if metric is not None:
+            metric = metric(**metric_kwargs)
+            metric_fn = metric.add
+
+        if metric is not None:
+            metric.reset()
+
+        test_loss = self.single_step(self.testloader, is_train_step=False, metric_fn=metric_fn)
+        print("Test loss = {:.7f}".format(test_loss))
+        if metric is not None:
+            metric_value = metric.value()
+            print("Test Metric - {}: {}".format(metric.__name__, metric_value))
+
+
+
 def test():
     class DummyNet(nn.Module):
         def __init__(self, n_channels):
@@ -253,7 +294,8 @@ def test():
     ### General hyper-parameters
     general_options = {
         'use_cuda' :          True,         # use GPU ?
-        'use_tensorboard' :   True          # Use Tensorboard for saving hparams and metrics ?
+        'use_tensorboard' :   True,         # Use Tensorboard for saving hparams and metrics ?
+        'tensorboard_weight_hist': False    # If save the histogram of model's weight at each epoch
     }
 
     ### Training hyper-parameters
