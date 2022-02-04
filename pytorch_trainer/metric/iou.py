@@ -4,8 +4,7 @@ from .confusionmatrix import ConfusionMatrix
 
 
 class IoU(Metric):
-    """Computes the intersection over union (IoU) per class and corresponding
-    mean (mIoU).
+    """Computes the intersection over union (IoU) per class.
 
     Intersection over union (IoU) is a common evaluation metric for semantic
     segmentation. The predictions are first accumulated in a confusion matrix
@@ -67,14 +66,9 @@ class IoU(Metric):
         self.conf_metric.add(predicted.reshape(-1), target.reshape(-1))
 
     def value(self):
-        """Computes the IoU and mean IoU.
-
-        The mean computation ignores NaN elements of the IoU array.
-
+        """Computes the IoU per class.
         Returns:
-            Tuple: (IoU, mIoU). The first output is the per class IoU,
-            for K classes it's numpy.ndarray with K elements. The second output,
-            is the mean IoU.
+            IoU(List): per class IoU, for K classes it's a list with K elements.
         """
         conf_matrix = self.conf_metric.value()
         if self.ignore_index is not None:
@@ -88,4 +82,46 @@ class IoU(Metric):
         with np.errstate(divide='ignore', invalid='ignore'):
             iou = true_positive / (true_positive + false_positive + false_negative)
 
-        return iou, np.nanmean(iou)
+        return list(iou)
+
+class MeanIOU(Metric):
+    """
+    Computes mean (mIoU)
+    Keyword arguments:
+    - num_classes (int): number of classes in the classification problem
+    - normalized (boolean, optional): Determines whether or not the confusion
+    matrix is normalized or not. Default: False.
+    - ignore_index (int or iterable, optional): Index of the classes to ignore
+    when computing the IoU. Can be an int, or any iterable of ints.
+    """
+
+    def __init__(self, num_classes, normalized=False, ignore_index=None):
+        super().__init__()
+        self.iou = IoU(num_classes, normalized, ignore_index)
+
+    def reset(self):
+        self.iou.reset()
+
+    def add(self, predicted, target):
+        """Adds the predicted and target pair to the IoU metric.
+
+        Keyword arguments:
+        - predicted (numpy.ndarray): Can be a (N, K, H, W) array of
+        predicted scores obtained from the model for N examples and K classes,
+        or (N, H, W) array of integer values between 0 and K-1.
+        - target (numpy.ndarray): Can be a (N, K, H, W) array of
+        target scores for N examples and K classes, or (N, H, W) array of
+        integer values between 0 and K-1.
+
+        """
+        self.iou.add(predicted, target)
+
+    def value(self):
+        """Computes mean IoU.
+
+        The mean computation ignores NaN elements of the IoU array.
+
+        Returns:
+            mean IoU.
+        """
+        return np.nanmean(self.iou)

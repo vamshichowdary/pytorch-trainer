@@ -187,12 +187,11 @@ class Trainer:
                     self.logger.add_scalars("losses", {'train': train_loss,
                                                     'val': val_loss}, e)
                     if metric is not None:
-                        if isinstance(train_metric_value, tuple):
-                            ## @TODO make this pretty
-                            train_metric_value = train_metric_value[0]
-                            val_metric_value = val_metric_value[0]
-
-                        self.logger.add_scalars(metric.__name__, {'train':train_metric_value ,
+                        if isinstance(train_metric_value, list):
+                            for mk in range(len(train_metric_value)):
+                                self.logger.add_scalars(metric.__name__+'_{}'.format(mk), {'train':train_metric_value[mk], 'val':val_metric_value[mk]}, e)
+                        else:
+                            self.logger.add_scalars(metric.__name__, {'train':train_metric_value ,
                                                     'val': val_metric_value}, e)
                     if self.tensorboard_weight_hist:
                         for param_name, param_w in self.model.named_parameters():
