@@ -233,7 +233,12 @@ class Trainer:
                             'Val_loss' : val_loss,
                     }
                     if metric is not None:
-                        metrics.update({ 'Train_'+metric.__name__ : train_metric_value, 'Val_'+metric.__name__ : val_metric_value })
+                        ## if list of metrics
+                        if isinstance(train_metric_value, list):
+                            for mk in range(len(train_metric_value)):
+                                metrics.update({ 'Train_'+metric.__name__+'_{}'.format(mk) : train_metric_value[mk], 'Val_'+metric.__name__+'_{}'.format(mk) : val_metric_value[mk] })
+                        else:
+                            metrics.update({ 'Train_'+metric.__name__ : train_metric_value, 'Val_'+metric.__name__ : val_metric_value })
                 else:
                     metrics = {}
                 self.logger.add_hparams(hparam_dict = stringify_dict(training_hparams), metric_dict = metrics)
