@@ -134,7 +134,8 @@ class Trainer:
             ## create directory if it doesn't exist
             if not os.path.exists(save_location):
                 os.makedirs(save_location)
-            save_model_path = os.path.join(save_location, save_name+'.pth')
+            save_model_path_best = os.path.join(save_location, save_name+'_best.pth')
+            save_model_path_last = os.path.join(save_location, save_name+'_last.pth')
             
             best_val_loss = torch.finfo(torch.float32).max  ## to save best model
         
@@ -152,6 +153,7 @@ class Trainer:
             self.model.load_state_dict(saved_model['state_dict'])
             self.optimizer.load_state_dict(saved_model['optimizer'])
             start_epoch = saved_model['epoch']
+            best_val_loss = saved_model['val_loss']
 
         train_loss, val_loss = None, None
         train_metric_value, val_metric_value = None, None
@@ -207,10 +209,18 @@ class Trainer:
                                         'train_loss': train_loss,
                                         'val_loss': val_loss,
                                         'optimizer': self.optimizer.state_dict()
-                                    }, save_model_path )
+                                    }, save_model_path_best )
                         self.model.to(self.device)
             ## end epoch for
         finally:
+            ## save the model trained until last epoch
+            torch.save( { 
+                            'epoch': e,
+                            'state_dict': self.model.to('cpu').state_dict(),
+                            'train_loss': train_loss,
+                            'val_loss': val_loss,
+                            'optimizer': self.optimizer.state_dict()
+                        }, save_model_path_last )
             ## logging
             if self.use_tensorboard:
                 images, labels = next(iter(self.trainloader))
