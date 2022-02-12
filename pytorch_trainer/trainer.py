@@ -221,6 +221,7 @@ class Trainer:
                             'val_loss': val_loss,
                             'optimizer': self.optimizer.state_dict()
                         }, save_model_path_last )
+            self.model.to(self.device)
             ## logging
             if self.use_tensorboard:
                 images, labels = next(iter(self.trainloader))

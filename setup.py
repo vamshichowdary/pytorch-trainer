@@ -14,7 +14,7 @@ if sys.argv[-1] == 'publish':
 
 setuptools.setup(
     name='pytorch-trainer-tensorboard',  
-    version='0.4.4',
+    version='0.4.5',
     license='MIT',
     author="Vamshi Chowdary Madala",
     author_email="vamchowdary72@gmail.com",
