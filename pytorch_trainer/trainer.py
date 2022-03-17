@@ -22,7 +22,12 @@ def stringify_dict(d):
         if isinstance(v, dict):
             str_d[k] = stringify_dict(v)
         else:
-            str_d[k] = v.__name__ if callable(v) else v 
+            if callable(v):
+                str_d[k] = v.__name__
+            elif isinstance(v, list):
+                str_d[k] = str(v)
+            else:
+                str_d[k] = v
     return str_d
 
 class Trainer:
