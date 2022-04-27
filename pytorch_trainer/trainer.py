@@ -143,7 +143,7 @@ class Trainer:
             save_model_path_last = os.path.join(save_location, save_name+'_last.pth')
             
             best_val_loss = torch.finfo(torch.float32).max  ## to save best model
-            best_val_metric = torch.finfo(torch.float32).max  ## to save best model
+            best_val_metric = 0  ## to save best model
         
         ## initialize the loss function
         self.criterion = loss_fn(**loss_fn_kwargs)
