@@ -143,6 +143,7 @@ class Trainer:
             save_model_path_last = os.path.join(save_location, save_name+'_last.pth')
             
             best_val_loss = torch.finfo(torch.float32).max  ## to save best model
+            best_val_metric = torch.finfo(torch.float32).max  ## to save best model
         
         ## initialize the loss function
         self.criterion = loss_fn(**loss_fn_kwargs)
@@ -159,6 +160,8 @@ class Trainer:
             self.optimizer.load_state_dict(saved_model['optimizer'])
             start_epoch = saved_model['epoch']
             best_val_loss = saved_model['val_loss']
+            if 'best_val_metric' in saved_model.keys():
+                best_val_metric = saved_model['best_val_metric']
 
         train_loss, val_loss = None, None
         train_metric_value, val_metric_value = None, None
@@ -206,16 +209,30 @@ class Trainer:
 
                 ## save best model
                 if save_best == True:
-                    if val_loss < best_val_loss:
-                        best_val_loss = val_loss
-                        torch.save( { 
-                                        'epoch': e,
-                                        'state_dict': self.model.to('cpu').state_dict(),
-                                        'train_loss': train_loss,
-                                        'val_loss': val_loss,
-                                        'optimizer': self.optimizer.state_dict()
-                                    }, save_model_path_best )
-                        self.model.to(self.device)
+                    if isinstance(val_metric_value, (int, float)):
+                        if val_metric_value > best_val_metric:
+                            best_val_metric = val_metric_value
+                            best_val_loss = val_loss
+                            torch.save( { 
+                                            'epoch': e,
+                                            'state_dict': self.model.to('cpu').state_dict(),
+                                            'train_loss': train_loss,
+                                            'val_loss': val_loss,
+                                            'best_val_metric': val_metric_value,
+                                            'optimizer': self.optimizer.state_dict()
+                                        }, save_model_path_best )
+                            self.model.to(self.device)
+                    else:
+                        if val_loss < best_val_loss:
+                            best_val_loss = val_loss
+                            torch.save( { 
+                                            'epoch': e,
+                                            'state_dict': self.model.to('cpu').state_dict(),
+                                            'train_loss': train_loss,
+                                            'val_loss': val_loss,
+                                            'optimizer': self.optimizer.state_dict()
+                                        }, save_model_path_best )
+                            self.model.to(self.device)
             ## end epoch for
         finally:
             ## save the model trained until last epoch
