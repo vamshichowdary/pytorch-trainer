@@ -23,6 +23,8 @@ class Accuracy(Metric):
             target (numpy.ndarray) : target output value
         """
         predicted = np.argmax(predicted, axis=1)
+        if target.ndim == 2: ## if the targets are provided as class probabilities
+            target = np.argmax(target, axis=1)
         self.total += target.shape[0]
         self.correct += (predicted == target).sum().item()
         
